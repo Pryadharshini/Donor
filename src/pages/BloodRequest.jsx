@@ -1,42 +1,82 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { FiAlertCircle, FiCheckCircle, FiPhone, FiUser, FiMapPin } from 'react-icons/fi';
 import { FaTint, FaHospital } from 'react-icons/fa';
-import { BLOOD_GROUPS, BLOOD_REQUESTS } from '../data/dummy';
+import axios from 'axios';
+import Select from 'react-select';
+import { Country, State, City } from 'country-state-city';
+import { BLOOD_GROUPS } from '../data/dummy';
 import { useApp } from '../context/AppContext';
 
 const URGENCY = ['Normal', 'Urgent', 'Critical'];
-const init = { patientName: '', bloodGroup: '', hospital: '', units: 1, urgency: 'Urgent', contact: '', notes: '' };
+const init = { 
+  patientName: '', bloodGroup: '', hospital: '', units: 1, urgency: 'Urgent', contact: '', notes: '',
+  countryCode: 'IN', stateCode: '', city: '', taluk: ''
+};
 
 export default function BloodRequest() {
   const [form, setForm] = useState(init);
   const [errors, setErrors] = useState({});
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [activeRequests, setActiveRequests] = useState([]);
   const { addToast } = useApp();
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
+  useEffect(() => {
+    const fetchRequests = async () => {
+      try {
+        const { data } = await axios.get('http://localhost:5000/api/requests');
+        setActiveRequests(data);
+      } catch (err) {
+        console.error('Failed to fetch requests', err);
+      }
+    };
+    fetchRequests();
+  }, []);
+
+  const states = useMemo(() => (form.countryCode ? State.getStatesOfCountry(form.countryCode) : []), [form.countryCode]);
+  const cities = useMemo(() => form.countryCode && form.stateCode ? City.getCitiesOfState(form.countryCode, form.stateCode) : [], [form.countryCode, form.stateCode]);
+  const stateOptions = useMemo(() => states.map(s => ({ value: s.isoCode, label: s.name })), [states]);
+  const cityOptions = useMemo(() => cities.map(c => ({ value: c.name, label: c.name })), [cities]);
 
   const validate = () => {
     const e = {};
     if (!form.patientName.trim()) e.patientName = 'Patient name required';
     if (!form.bloodGroup) e.bloodGroup = 'Blood group required';
     if (!form.hospital.trim()) e.hospital = 'Hospital name required';
+    if (!form.stateCode) e.stateCode = 'State required';
+    if (!form.city) e.city = 'City required';
+    if (!form.taluk.trim()) e.taluk = 'Taluk required';
     if (!form.units || form.units < 1) e.units = 'At least 1 unit required';
     if (!form.contact || !/^\d{10}$/.test(form.contact.replace(/\D/g, ''))) e.contact = 'Valid 10-digit number required';
     return e;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const errs = validate();
     setErrors(errs);
     if (Object.keys(errs).length) return;
 
     setLoading(true);
-    setTimeout(() => {
+    try {
+      await axios.post('http://localhost:5000/api/requests', form);
       setLoading(false);
       setSubmitted(true);
+      window.scrollTo(0, 0);
       addToast('Blood request submitted! Donors in your area will be notified.', 'success');
-    }, 1500);
+      
+      // Refresh requests
+      const { data } = await axios.get('http://localhost:5000/api/requests');
+      setActiveRequests(data);
+    } catch (error) {
+      setLoading(false);
+      addToast('Failed to submit request', 'error');
+    }
   };
 
   const set = (k, v) => { setForm(p => ({ ...p, [k]: v })); setErrors(p => ({ ...p, [k]: '' })); };
@@ -81,14 +121,11 @@ export default function BloodRequest() {
         <p className="text-red-200">Submit your request and we'll connect you with donors immediately</p>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Form */}
-          <div className="lg:col-span-2">
-            <div className="card p-8">
-              <h2 className="font-bold text-gray-900 dark:text-white text-xl mb-6 flex items-center gap-2">
-                <FaTint className="text-red-500" /> Blood Request Form
-              </h2>
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-10">
+        <div className="card p-8">
+          <h2 className="font-bold text-gray-900 dark:text-white text-xl mb-6 flex items-center gap-2">
+            <FaTint className="text-red-500" /> Blood Request Form
+          </h2>
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div>
@@ -114,6 +151,41 @@ export default function BloodRequest() {
                       <input value={form.hospital} onChange={e => set('hospital', e.target.value)} placeholder="Hospital name" className={`input-field pl-10 ${errors.hospital ? 'border-red-400' : ''}`} />
                     </div>
                     {errors.hospital && <p className="text-red-500 text-xs mt-1">{errors.hospital}</p>}
+                  </div>
+                  <div>
+                    <label className="label">State / Province <span className="text-red-500">*</span></label>
+                    <Select
+                      options={stateOptions}
+                      value={stateOptions.find(opt => opt.value === form.stateCode) || null}
+                      onChange={(selected) => { set('stateCode', selected ? selected.value : ''); set('city', ''); set('taluk', ''); }}
+                      placeholder={!form.countryCode ? "Select country first..." : "Type to search state..."}
+                      isDisabled={!form.countryCode}
+                      className="text-gray-900"
+                    />
+                    {errors.stateCode && <p className="text-red-500 text-xs mt-1">{errors.stateCode}</p>}
+                  </div>
+                  <div>
+                    <label className="label">City <span className="text-red-500">*</span></label>
+                    <Select
+                      options={cityOptions}
+                      value={cityOptions.find(opt => opt.value === form.city) || null}
+                      onChange={(selected) => { set('city', selected ? selected.value : ''); set('taluk', ''); }}
+                      placeholder={!form.stateCode ? "Select state first..." : "Type to search city..."}
+                      isDisabled={!form.stateCode}
+                      className="text-gray-900"
+                    />
+                    {errors.city && <p className="text-red-500 text-xs mt-1">{errors.city}</p>}
+                  </div>
+                  <div>
+                    <label className="label">Taluk <span className="text-red-500">*</span></label>
+                    <input
+                      value={form.taluk}
+                      onChange={e => set('taluk', e.target.value)}
+                      placeholder={!form.city ? "Select city first..." : "Enter taluk"}
+                      className={`input-field ${errors.taluk ? 'border-red-400' : ''} ${!form.city ? 'opacity-50 cursor-not-allowed bg-gray-100 dark:bg-gray-800' : ''}`}
+                      disabled={!form.city}
+                    />
+                    {errors.taluk && <p className="text-red-500 text-xs mt-1">{errors.taluk}</p>}
                   </div>
                   <div>
                     <label className="label">Units Required <span className="text-red-500">*</span></label>
@@ -149,50 +221,6 @@ export default function BloodRequest() {
                   {loading ? <><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Submitting Request...</> : <><FiAlertCircle /> Submit Blood Request</>}
                 </button>
               </form>
-            </div>
-          </div>
-
-          {/* Active Requests Sidebar */}
-          <div className="space-y-5">
-            <div className="card p-5">
-              <h3 className="font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                <FiAlertCircle className="text-red-500 animate-pulse" /> Active Requests Near You
-              </h3>
-              <div className="space-y-3">
-                {BLOOD_REQUESTS.filter(r => r.status === 'Active').map(req => (
-                  <div key={req.id} className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-semibold text-gray-900 dark:text-white text-sm">{req.patientName}</span>
-                      <span className="blood-badge !w-10 !h-7 text-xs">{req.bloodGroup}</span>
-                    </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
-                      <p className="flex items-center gap-1"><FaHospital size={11} /> {req.hospital}</p>
-                      <p className="flex items-center gap-1"><FiMapPin size={11} /> {req.city}</p>
-                    </div>
-                    <div className="flex items-center justify-between mt-2">
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${req.urgency === 'Critical' ? 'bg-red-100 text-red-700 animate-pulse' : 'bg-orange-100 text-orange-700'}`}>{req.urgency}</span>
-                      <span className="text-xs text-gray-400">{req.units} unit(s)</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <Link to="/find-donor" className="block mt-4 text-center text-sm text-red-600 dark:text-red-400 hover:text-red-700 font-medium">
-                View All Requests →
-              </Link>
-            </div>
-
-            {/* Emergency Tips */}
-            <div className="card p-5 bg-red-50 dark:bg-red-900/20 border-red-100 dark:border-red-900/30">
-              <h3 className="font-semibold text-red-800 dark:text-red-300 mb-3 flex items-center gap-2">
-                <FiAlertCircle size={16} /> Emergency Tips
-              </h3>
-              <ul className="text-sm text-red-700 dark:text-red-400 space-y-2">
-                {['Also call 1800-BLOOD for immediate assistance', 'Contact nearby blood banks directly', 'Post on social media for faster reach', 'Check hospital blood bank first'].map(t => (
-                  <li key={t} className="flex items-start gap-2"><span className="mt-1">•</span>{t}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
         </div>
       </div>
     </div>

@@ -1,8 +1,10 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Country, State, City } from 'country-state-city';
 import { FiSearch, FiFilter, FiRefreshCw } from 'react-icons/fi';
 import { FaTint } from 'react-icons/fa';
+import axios from 'axios';
+import Select from 'react-select';
 import { BLOOD_GROUPS, DONORS } from '../data/dummy';
 import DonorCard from '../components/DonorCard';
 import { DonorCardSkeleton } from '../components/LoadingSkeleton';
@@ -18,12 +20,14 @@ export default function FindDonor() {
     countryCode: 'IN',
     stateCode: '',
     city: searchParams.get('city') || '',
+    taluk: '',
   });
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [page, setPage] = useState(1);
   const [showFilters, setShowFilters] = useState(true);
+  const resultsRef = useRef(null);
 
   // Derived lists from country-state-city
   const allCountries = useMemo(() => Country.getAllCountries(), []);
@@ -47,34 +51,57 @@ export default function FindDonor() {
     [states, filters.stateCode]
   );
 
-  const handleSearch = () => {
+  const stateOptions = useMemo(() => states.map(s => ({ value: s.isoCode, label: s.name })), [states]);
+  const cityOptions = useMemo(() => cities.map(c => ({ value: c.name, label: c.name })), [cities]);
+
+  const handleSearch = async () => {
     setLoading(true);
     setSearched(true);
-    setTimeout(() => {
-      const filtered = DONORS.filter((d) => {
-        if (filters.bloodGroup && d.bloodGroup !== filters.bloodGroup) return false;
-        if (selectedStateName && d.state !== selectedStateName) return false;
-        if (filters.city && !d.city.toLowerCase().includes(filters.city.toLowerCase())) return false;
-        return true;
-      });
-      setResults(filtered);
+    try {
+      const params = new URLSearchParams();
+      if (filters.bloodGroup) params.append('bloodGroup', filters.bloodGroup);
+      if (filters.city) params.append('city', filters.city);
+      if (filters.taluk) params.append('taluk', filters.taluk);
+
+      const { data } = await axios.get(`http://localhost:5000/api/donors/search?${params.toString()}`);
+      
+      // Map MongoDB _id to id so the DonorCard works without modification
+      const mappedData = data.map(d => ({ 
+        ...d, 
+        id: d._id, 
+        name: d.fullName,
+        phone: d.mobile,
+        location: `${d.city}, ${d.taluk}`,
+        donations: 0,
+        available: true 
+      }));
+      setResults(mappedData);
       setPage(1);
+      
+      // Auto-scroll to results
+      setTimeout(() => {
+        resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    } catch (error) {
+      console.error('Search failed', error);
+      setResults([]);
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
   const handleReset = () => {
-    setFilters({ bloodGroup: '', countryCode: 'IN', stateCode: '', city: '' });
+    setFilters({ bloodGroup: '', countryCode: 'IN', stateCode: '', city: '', taluk: '' });
     setResults([]);
     setSearched(false);
   };
 
   const handleCountryChange = (e) => {
-    setFilters((p) => ({ ...p, countryCode: e.target.value, stateCode: '', city: '' }));
+    setFilters((p) => ({ ...p, countryCode: e.target.value, stateCode: '', city: '', taluk: '' }));
   };
 
   const handleStateChange = (e) => {
-    setFilters((p) => ({ ...p, stateCode: e.target.value, city: '' }));
+    setFilters((p) => ({ ...p, stateCode: e.target.value, city: '', taluk: '' }));
   };
 
   useEffect(() => {
@@ -145,42 +172,39 @@ export default function FindDonor() {
               {/* State */}
               <div>
                 <label className="label">State / Province</label>
-                <select
-                  value={filters.stateCode}
-                  onChange={handleStateChange}
-                  className="input-field"
-                  disabled={!filters.countryCode}
-                >
-                  <option value="">All States</option>
-                  {states.map((s) => (
-                    <option key={s.isoCode} value={s.isoCode}>{s.name}</option>
-                  ))}
-                </select>
+                <Select
+                  options={stateOptions}
+                  value={stateOptions.find(opt => opt.value === filters.stateCode) || null}
+                  onChange={(selected) => setFilters((p) => ({ ...p, stateCode: selected ? selected.value : '', city: '', taluk: '' }))}
+                  placeholder={!filters.countryCode ? "Select country first..." : "Type to search state..."}
+                  isDisabled={!filters.countryCode}
+                  className="text-gray-900"
+                />
               </div>
 
-              {/* City — dropdown if library has cities, else free text */}
+              {/* City */}
               <div>
                 <label className="label">City</label>
-                {cities.length > 0 ? (
-                  <select
-                    value={filters.city}
-                    onChange={(e) => setFilters((p) => ({ ...p, city: e.target.value }))}
-                    className="input-field"
-                    disabled={!filters.stateCode}
-                  >
-                    <option value="">All Cities</option>
-                    {cities.map((c) => (
-                      <option key={c.name} value={c.name}>{c.name}</option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    value={filters.city}
-                    onChange={(e) => setFilters((p) => ({ ...p, city: e.target.value }))}
-                    placeholder="Enter city..."
-                    className="input-field"
-                  />
-                )}
+                <Select
+                  options={cityOptions}
+                  value={cityOptions.find(opt => opt.value === filters.city) || null}
+                  onChange={(selected) => setFilters((p) => ({ ...p, city: selected ? selected.value : '', taluk: '' }))}
+                  placeholder={!filters.stateCode ? "Select state first..." : "Type to search city..."}
+                  isDisabled={!filters.stateCode}
+                  className="text-gray-900"
+                />
+              </div>
+
+              {/* Taluk */}
+              <div>
+                <label className="label">Taluk</label>
+                <input
+                  value={filters.taluk}
+                  onChange={(e) => setFilters((p) => ({ ...p, taluk: e.target.value }))}
+                  placeholder={!filters.city ? "Select city first..." : "Enter taluk..."}
+                  className={`input-field ${!filters.city ? 'opacity-50 cursor-not-allowed bg-gray-100 dark:bg-gray-800' : ''}`}
+                  disabled={!filters.city}
+                />
               </div>
             </div>
           )}
@@ -217,6 +241,9 @@ export default function FindDonor() {
             </button>
           ))}
         </div>
+
+        {/* Scroll anchor */}
+        <div ref={resultsRef} className="-mt-20 pt-20"></div>
 
         {/* Results */}
         {loading && (

@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
+import axios from 'axios';
 
 const AppContext = createContext();
 
@@ -13,6 +14,25 @@ export function AppProvider({ children }) {
     if (darkMode) document.documentElement.classList.add('dark');
     else document.documentElement.classList.remove('dark');
   }, [darkMode]);
+
+  useEffect(() => {
+    const autoLogin = async () => {
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (!token) return;
+
+      try {
+        const { data } = await axios.get('http://localhost:5000/api/donors/profile', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setUser({ name: data.fullName, email: data.email, bloodGroup: data.bloodGroup, role: data.role || 'donor' });
+      } catch (error) {
+        // Token is invalid or expired
+        localStorage.removeItem('token');
+        sessionStorage.removeItem('token');
+      }
+    };
+    autoLogin();
+  }, []);
 
   const addToast = (message, type = 'success') => {
     const id = Date.now();
@@ -30,6 +50,8 @@ export function AppProvider({ children }) {
   };
 
   const logout = () => {
+    localStorage.removeItem('token');
+    sessionStorage.removeItem('token');
     setUser(null);
     addToast('Logged out successfully.', 'info');
   };

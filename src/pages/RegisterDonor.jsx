@@ -1,23 +1,60 @@
-import { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useMemo, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Country, State, City } from 'country-state-city';
-import { FiUser, FiMail, FiPhone, FiCalendar, FiMapPin, FiCheckCircle } from 'react-icons/fi';
+import { FiUser, FiMail, FiPhone, FiCalendar, FiMapPin, FiCheckCircle, FiLock } from 'react-icons/fi';
 import { FaTint } from 'react-icons/fa';
+import axios from 'axios';
+import Select from 'react-select';
 import { BLOOD_GROUPS } from '../data/dummy';
 import { useApp } from '../context/AppContext';
 
 const initialForm = {
-  fullName: '', age: '', gender: '', bloodGroup: '', mobile: '', email: '',
-  address: '', countryCode: 'IN', stateCode: '', city: '',
+  fullName: '', age: '', gender: '', bloodGroup: '', mobile: '', email: '', password: '',
+  address: '', countryCode: 'IN', stateCode: '', city: '', taluk: '',
   lastDonation: '', agreeTerms: false, agreeContact: false,
 };
+
+const Field = ({ label, error, children, required }) => (
+  <div>
+    <label className="label">
+      {label}{required && <span className="text-red-500 ml-1">*</span>}
+    </label>
+    {children}
+    {error && (
+      <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+        <FiCheckCircle size={11} />{error}
+      </p>
+    )}
+  </div>
+);
 
 export default function RegisterDonor() {
   const [form, setForm] = useState(initialForm);
   const [errors, setErrors] = useState({});
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
-  const { addToast } = useApp();
+  const { addToast, user } = useApp();
+  const navigate = useNavigate();
+
+  if (user) {
+    return (
+      <div className="pt-16 min-h-screen flex items-center justify-center px-4 bg-gray-50 dark:bg-gray-950">
+        <div className="text-center max-w-md">
+          <div className="w-24 h-24 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mx-auto mb-6">
+            <FiCheckCircle size={48} className="text-blue-500" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">You are already a registered user!</h2>
+          <p className="text-gray-500 dark:text-gray-400 mb-8">
+            You are currently logged in as <strong>{user.name}</strong>. You don't need to register again to donate blood.
+          </p>
+          <div className="flex gap-3 justify-center">
+            <Link to="/dashboard" className="btn-primary">Go to Dashboard</Link>
+            <Link to="/" className="btn-secondary">Return Home</Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Derived lists
   const allCountries = useMemo(() => Country.getAllCountries(), []);
@@ -53,25 +90,31 @@ export default function RegisterDonor() {
     if (!form.bloodGroup) e.bloodGroup = 'Blood group is required';
     if (!form.mobile || !/^\d{10}$/.test(form.mobile.replace(/\s/g, ''))) e.mobile = 'Valid 10-digit mobile required';
     if (!form.email || !/\S+@\S+\.\S+/.test(form.email)) e.email = 'Valid email is required';
+    if (!form.password || form.password.length < 6) e.password = 'Password must be at least 6 characters';
     if (!form.countryCode) e.countryCode = 'Country is required';
     if (!form.stateCode) e.stateCode = 'State is required';
     if (!form.city.trim()) e.city = 'City is required';
+    if (!form.taluk.trim()) e.taluk = 'Taluk is required';
     if (!form.agreeTerms) e.agreeTerms = 'You must agree to terms';
     return e;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const errs = validate();
     setErrors(errs);
     if (Object.keys(errs).length > 0) return;
 
     setLoading(true);
-    setTimeout(() => {
+    try {
+      const { data } = await axios.post('http://localhost:5000/api/donors/register', form);
       setLoading(false);
       setSubmitted(true);
       addToast('Registration successful! Welcome to Nanbargal Blood Foundation.', 'success');
-    }, 1500);
+    } catch (error) {
+      setLoading(false);
+      addToast(error.response?.data?.message || 'Registration failed', 'error');
+    }
   };
 
   const set = (k, v) => {
@@ -85,9 +128,12 @@ export default function RegisterDonor() {
   };
 
   const handleStateChange = (v) => {
-    setForm((p) => ({ ...p, stateCode: v, city: '' }));
-    setErrors((p) => ({ ...p, stateCode: '', city: '' }));
+    setForm((p) => ({ ...p, stateCode: v, city: '', taluk: '' }));
+    setErrors((p) => ({ ...p, stateCode: '', city: '', taluk: '' }));
   };
+
+  const stateOptions = useMemo(() => states.map(s => ({ value: s.isoCode, label: s.name })), [states]);
+  const cityOptions = useMemo(() => cities.map(c => ({ value: c.name, label: c.name })), [cities]);
 
   if (submitted) {
     return (
@@ -112,7 +158,7 @@ export default function RegisterDonor() {
             <div className="flex justify-between text-sm">
               <span className="text-gray-500">Location</span>
               <span className="font-semibold text-gray-900 dark:text-white">
-                {form.city}, {selectedStateName}
+                {form.city}, {form.taluk}, {selectedStateName}
               </span>
             </div>
             <div className="flex justify-between text-sm">
@@ -129,19 +175,7 @@ export default function RegisterDonor() {
     );
   }
 
-  const Field = ({ label, error, children, required }) => (
-    <div>
-      <label className="label">
-        {label}{required && <span className="text-red-500 ml-1">*</span>}
-      </label>
-      {children}
-      {error && (
-        <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
-          <FiCheckCircle size={11} />{error}
-        </p>
-      )}
-    </div>
-  );
+
 
   return (
     <div className="pt-16 min-h-screen bg-gray-50 dark:bg-gray-950">
@@ -226,6 +260,15 @@ export default function RegisterDonor() {
                     className={`input-field ${errors.email ? 'border-red-400' : ''}`}
                   />
                 </Field>
+                <Field label="Password" error={errors.password} required>
+                  <input
+                    type="password"
+                    value={form.password}
+                    onChange={(e) => set('password', e.target.value)}
+                    placeholder="Create a password"
+                    className={`input-field ${errors.password ? 'border-red-400' : ''}`}
+                  />
+                </Field>
               </div>
             </div>
 
@@ -264,41 +307,40 @@ export default function RegisterDonor() {
 
                 {/* State */}
                 <Field label="State / Province" error={errors.stateCode} required>
-                  <select
-                    value={form.stateCode}
-                    onChange={(e) => handleStateChange(e.target.value)}
-                    className={`input-field ${errors.stateCode ? 'border-red-400' : ''}`}
-                    disabled={!form.countryCode}
-                  >
-                    <option value="">Select state</option>
-                    {states.map((s) => (
-                      <option key={s.isoCode} value={s.isoCode}>{s.name}</option>
-                    ))}
-                  </select>
+                  <Select
+                    options={stateOptions}
+                    value={stateOptions.find(opt => opt.value === form.stateCode) || null}
+                    onChange={(selected) => handleStateChange(selected ? selected.value : '')}
+                    placeholder={!form.countryCode ? "Select country first..." : "Type to search state..."}
+                    isDisabled={!form.countryCode}
+                    className="text-gray-900"
+                  />
                 </Field>
 
-                {/* City — dropdown if library has cities, else free text */}
-                <Field label="City" error={errors.city} required>
-                  {cities.length > 0 ? (
-                    <select
-                      value={form.city}
-                      onChange={(e) => set('city', e.target.value)}
-                      className={`input-field ${errors.city ? 'border-red-400' : ''}`}
-                      disabled={!form.stateCode}
-                    >
-                      <option value="">Select city</option>
-                      {cities.map((c) => (
-                        <option key={c.name} value={c.name}>{c.name}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input
-                      value={form.city}
-                      onChange={(e) => set('city', e.target.value)}
-                      placeholder="Enter city"
-                      className={`input-field ${errors.city ? 'border-red-400' : ''}`}
-                    />
-                  )}
+                {/* City */}
+                <Field label="City / District" error={errors.city} required>
+                  <Select
+                    options={cityOptions}
+                    value={cityOptions.find(opt => opt.value === form.city) || null}
+                    onChange={(selected) => {
+                      set('city', selected ? selected.value : '');
+                      set('taluk', ''); // reset taluk when city changes
+                    }}
+                    placeholder={!form.stateCode ? "Select state first..." : "Type to search city..."}
+                    isDisabled={!form.stateCode}
+                    className="text-gray-900"
+                  />
+                </Field>
+
+                {/* Taluk */}
+                <Field label="Taluk" error={errors.taluk} required>
+                  <input
+                    value={form.taluk}
+                    onChange={(e) => set('taluk', e.target.value)}
+                    placeholder={!form.city ? "Select city first..." : "Enter taluk"}
+                    className={`input-field ${errors.taluk ? 'border-red-400' : ''} ${!form.city ? 'opacity-50 cursor-not-allowed bg-gray-100 dark:bg-gray-800' : ''}`}
+                    disabled={!form.city}
+                  />
                 </Field>
               </div>
             </div>

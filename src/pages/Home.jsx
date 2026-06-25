@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import Select from 'react-select';
 import { Country, State, City } from 'country-state-city';
 import { FaDroplet, FaHeartPulse } from 'react-icons/fa6';
 import { FiArrowRight, FiSearch, FiUsers, FiHeart, FiAlertCircle, FiCheckCircle } from 'react-icons/fi';
@@ -25,6 +26,7 @@ export default function Home() {
     countryCode: '',   // e.g. "IN"
     stateCode: '',     // e.g. "TN"
     city: '',
+    taluk: '',
   });
   const navigate = useNavigate();
 
@@ -46,12 +48,57 @@ export default function Home() {
     [searchForm.countryCode, searchForm.stateCode]
   );
 
+  const countryOptions = useMemo(() => allCountries.map(c => ({ value: c.isoCode, label: `${c.flag} ${c.name}` })), [allCountries]);
+  const stateOptions = useMemo(() => states.map(s => ({ value: s.isoCode, label: s.name })), [states]);
+  const cityOptions = useMemo(() => cities.map(c => ({ value: c.name, label: c.name })), [cities]);
+
+  // Custom styles for react-select to match the translucent dark theme of the hero card
+  const selectStyles = {
+    control: (base) => ({
+      ...base,
+      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+      borderColor: 'rgba(255, 255, 255, 0.2)',
+      color: 'white',
+      padding: '4px',
+      borderRadius: '0.75rem',
+      boxShadow: 'none',
+      '&:hover': {
+        borderColor: 'rgba(255, 255, 255, 0.5)',
+      }
+    }),
+    singleValue: (base) => ({
+      ...base,
+      color: 'white',
+    }),
+    placeholder: (base) => ({
+      ...base,
+      color: 'rgba(255, 255, 255, 0.4)',
+    }),
+    menu: (base) => ({
+      ...base,
+      backgroundColor: '#1f2937', // dark-800
+      zIndex: 50
+    }),
+    option: (base, state) => ({
+      ...base,
+      backgroundColor: state.isFocused ? '#374151' : 'transparent',
+      color: 'white',
+      '&:active': {
+        backgroundColor: '#4b5563',
+      }
+    }),
+    input: (base) => ({
+      ...base,
+      color: 'white',
+    })
+  };
+
   const handleCountryChange = (e) => {
-    setSearchForm((p) => ({ ...p, countryCode: e.target.value, stateCode: '', city: '' }));
+    setSearchForm((p) => ({ ...p, countryCode: e.target.value, stateCode: '', city: '', taluk: '' }));
   };
 
   const handleStateChange = (e) => {
-    setSearchForm((p) => ({ ...p, stateCode: e.target.value, city: '' }));
+    setSearchForm((p) => ({ ...p, stateCode: e.target.value, city: '', taluk: '' }));
   };
 
   const handleSearch = (e) => {
@@ -59,12 +106,12 @@ export default function Home() {
     // Resolve human-readable names for the query string
     const countryName = allCountries.find((c) => c.isoCode === searchForm.countryCode)?.name || '';
     const stateName = states.find((s) => s.isoCode === searchForm.stateCode)?.name || '';
-    const params = new URLSearchParams({
-      bloodGroup: searchForm.bloodGroup,
-      country: countryName,
-      state: stateName,
-      city: searchForm.city,
-    });
+    const params = new URLSearchParams();
+    if (searchForm.bloodGroup) params.append('bloodGroup', searchForm.bloodGroup);
+    if (countryName) params.append('country', countryName);
+    if (stateName) params.append('state', stateName);
+    if (searchForm.city) params.append('city', searchForm.city);
+    if (searchForm.taluk) params.append('taluk', searchForm.taluk);
     navigate(`/find-donor?${params}`);
   };
 
@@ -134,36 +181,28 @@ export default function Home() {
                 {/* Country */}
                 <div>
                   <label className="block text-white/70 text-sm font-medium mb-1.5">Country</label>
-                  <select
-                    value={searchForm.countryCode}
-                    onChange={handleCountryChange}
-                    className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/20 text-white focus:outline-none focus:border-white/50 transition-all"
-                  >
-                    <option value="" className="text-gray-900">All Countries</option>
-                    {allCountries.map((c) => (
-                      <option key={c.isoCode} value={c.isoCode} className="text-gray-900">
-                        {c.flag} {c.name}
-                      </option>
-                    ))}
-                  </select>
+                  <Select
+                    options={countryOptions}
+                    value={countryOptions.find(opt => opt.value === searchForm.countryCode) || null}
+                    onChange={(selected) => setSearchForm(p => ({ ...p, countryCode: selected ? selected.value : '', stateCode: '', city: '' }))}
+                    placeholder="Search country..."
+                    styles={selectStyles}
+                    isClearable
+                  />
                 </div>
 
                 {/* State — shown only when a country is selected */}
                 {searchForm.countryCode && (
                   <div>
                     <label className="block text-white/70 text-sm font-medium mb-1.5">State / Province</label>
-                    <select
-                      value={searchForm.stateCode}
-                      onChange={handleStateChange}
-                      className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/20 text-white focus:outline-none focus:border-white/50 transition-all"
-                    >
-                      <option value="" className="text-gray-900">All States</option>
-                      {states.map((s) => (
-                        <option key={s.isoCode} value={s.isoCode} className="text-gray-900">
-                          {s.name}
-                        </option>
-                      ))}
-                    </select>
+                    <Select
+                      options={stateOptions}
+                      value={stateOptions.find(opt => opt.value === searchForm.stateCode) || null}
+                      onChange={(selected) => setSearchForm(p => ({ ...p, stateCode: selected ? selected.value : '', city: '' }))}
+                      placeholder="Search state..."
+                      styles={selectStyles}
+                      isClearable
+                    />
                   </div>
                 )}
 
@@ -172,26 +211,35 @@ export default function Home() {
                   <div>
                     <label className="block text-white/70 text-sm font-medium mb-1.5">City</label>
                     {cities.length > 0 ? (
-                      <select
-                        value={searchForm.city}
-                        onChange={(e) => setSearchForm((p) => ({ ...p, city: e.target.value }))}
-                        className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/20 text-white focus:outline-none focus:border-white/50 transition-all"
-                      >
-                        <option value="" className="text-gray-900">All Cities</option>
-                        {cities.map((c) => (
-                          <option key={c.name} value={c.name} className="text-gray-900">
-                            {c.name}
-                          </option>
-                        ))}
-                      </select>
+                      <Select
+                        options={cityOptions}
+                        value={cityOptions.find(opt => opt.value === searchForm.city) || null}
+                        onChange={(selected) => setSearchForm(p => ({ ...p, city: selected ? selected.value : '', taluk: '' }))}
+                        placeholder="Search city..."
+                        styles={selectStyles}
+                        isClearable
+                      />
                     ) : (
                       <input
                         value={searchForm.city}
-                        onChange={(e) => setSearchForm((p) => ({ ...p, city: e.target.value }))}
+                        onChange={(e) => setSearchForm((p) => ({ ...p, city: e.target.value, taluk: '' }))}
                         placeholder="Enter city name"
                         className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/20 text-white placeholder-white/40 focus:outline-none focus:border-white/50 transition-all"
                       />
                     )}
+                  </div>
+                )}
+
+                {/* Taluk */}
+                {searchForm.city && (
+                  <div>
+                    <label className="block text-white/70 text-sm font-medium mb-1.5">Taluk</label>
+                    <input
+                      value={searchForm.taluk}
+                      onChange={(e) => setSearchForm((p) => ({ ...p, taluk: e.target.value }))}
+                      placeholder="Enter taluk name..."
+                      className="w-full px-4 py-2.5 rounded-xl bg-white/10 border border-white/20 text-white placeholder-white/40 focus:outline-none focus:border-white/50 transition-all"
+                    />
                   </div>
                 )}
 

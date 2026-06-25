@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { FiMail, FiLock, FiEye, FiEyeOff, FiArrowRight } from 'react-icons/fi';
+import { FiMail, FiLock, FiEye, FiEyeOff, FiArrowRight, FiCheckCircle } from 'react-icons/fi';
 import { FaTint } from 'react-icons/fa';
+import axios from 'axios';
 import { useApp } from '../context/AppContext';
 
 export default function Login() {
@@ -9,10 +10,30 @@ export default function Login() {
   const [showPwd, setShowPwd] = useState(false);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
-  const { login } = useApp();
+  const { login, user } = useApp();
   const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  if (user) {
+    return (
+      <div className="pt-16 min-h-screen flex items-center justify-center px-4 bg-gray-50 dark:bg-gray-950">
+        <div className="text-center max-w-md">
+          <div className="w-24 h-24 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mx-auto mb-6">
+            <FiCheckCircle size={48} className="text-blue-500" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">You are already logged in!</h2>
+          <p className="text-gray-500 dark:text-gray-400 mb-8">
+            You are currently logged in as <strong>{user.name}</strong>.
+          </p>
+          <div className="flex gap-3 justify-center">
+            <Link to="/dashboard" className="btn-primary">Go to Dashboard</Link>
+            <Link to="/" className="btn-secondary">Return Home</Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const errs = {};
     if (!form.email) errs.email = 'Email is required';
@@ -21,10 +42,21 @@ export default function Login() {
     if (Object.keys(errs).length) return;
 
     setLoading(true);
-    setTimeout(() => {
-      login({ name: 'Rajan Kumar', email: form.email, bloodGroup: 'O+', role: 'donor' });
+    try {
+      const { data } = await axios.post('http://localhost:5000/api/donors/login', form);
+      
+      if (form.remember) {
+        localStorage.setItem('token', data.token);
+      } else {
+        sessionStorage.setItem('token', data.token);
+      }
+      
+      login({ name: data.fullName, email: data.email, bloodGroup: data.bloodGroup, role: data.role || 'donor' });
       navigate('/dashboard');
-    }, 1200);
+    } catch (error) {
+      setLoading(false);
+      setErrors({ email: error.response?.data?.message || 'Login failed' });
+    }
   };
 
   return (
@@ -66,7 +98,7 @@ export default function Login() {
                 <input type="checkbox" checked={form.remember} onChange={e => setForm(p => ({ ...p, remember: e.target.checked }))} className="accent-red-600" />
                 Remember me
               </label>
-              <a href="#" className="text-sm text-red-600 hover:text-red-700 dark:text-red-400 font-medium">Forgot password?</a>
+              <Link to="/forgot-password" className="text-sm text-red-600 hover:text-red-700 dark:text-red-400 font-medium">Forgot password?</Link>
             </div>
 
             <button type="submit" disabled={loading}

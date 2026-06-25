@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { FiMenu, FiX, FiMoon, FiSun, FiUser, FiLogOut, FiChevronDown } from 'react-icons/fi';
 import { FaHeartbeat, FaTint } from 'react-icons/fa';
@@ -18,13 +18,28 @@ export default function Navbar() {
   const { darkMode, setDarkMode, user, logout } = useApp();
   const location = useLocation();
 
+  const menuRef = useRef(null);
+
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  useEffect(() => { setOpen(false); }, [location]);
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setUserMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => { 
+    setOpen(false); 
+    setUserMenu(false);
+  }, [location]);
 
   return (
     <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? 'bg-white/95 dark:bg-gray-900/95 backdrop-blur-md shadow-lg' : 'bg-white dark:bg-gray-900'} border-b border-gray-100 dark:border-gray-800`}>
@@ -41,12 +56,18 @@ export default function Navbar() {
 
           {/* Desktop Nav */}
           <div className="hidden md:flex items-center gap-1">
-            {navLinks.map(link => (
+            {navLinks.filter(link => !user || link.path !== '/register-donor').map(link => (
               <Link key={link.path} to={link.path}
                 className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${location.pathname === link.path ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-red-600 dark:hover:text-red-400'}`}>
                 {link.label}
               </Link>
             ))}
+            {user && (
+              <Link to="/active-requests"
+                className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${location.pathname === '/active-requests' ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-red-600 dark:hover:text-red-400'}`}>
+                Active Requests
+              </Link>
+            )}
           </div>
 
           {/* Right Side */}
@@ -57,7 +78,7 @@ export default function Navbar() {
             </button>
 
             {user ? (
-              <div className="relative">
+              <div className="relative" ref={menuRef}>
                 <button onClick={() => setUserMenu(!userMenu)}
                   className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors text-sm font-medium">
                   <FiUser size={16} />
@@ -69,9 +90,11 @@ export default function Navbar() {
                     <Link to="/dashboard" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
                       <FaHeartbeat size={14} /> My Dashboard
                     </Link>
-                    <Link to="/admin" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
-                      <FaTint size={14} /> Admin Panel
-                    </Link>
+                    {user.role === 'admin' && (
+                      <Link to="/admin" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <FaTint size={14} /> Admin Panel
+                      </Link>
+                    )}
                     <hr className="my-1 border-gray-100 dark:border-gray-700" />
                     <button onClick={logout} className="flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 w-full text-left">
                       <FiLogOut size={14} /> Logout
@@ -95,7 +118,7 @@ export default function Navbar() {
         {/* Mobile Menu */}
         {open && (
           <div className="md:hidden border-t border-gray-100 dark:border-gray-800 py-3 space-y-1 animate-fade-in">
-            {navLinks.map(link => (
+            {navLinks.filter(link => !user || link.path !== '/register-donor').map(link => (
               <Link key={link.path} to={link.path}
                 className={`block px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${location.pathname === link.path ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
                 {link.label}
@@ -111,6 +134,7 @@ export default function Navbar() {
             )}
             {user && (
               <>
+                <Link to="/active-requests" className="block px-4 py-2.5 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">Active Requests</Link>
                 <Link to="/dashboard" className="block px-4 py-2.5 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">Dashboard</Link>
                 <button onClick={logout} className="block w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20">Logout</button>
               </>
