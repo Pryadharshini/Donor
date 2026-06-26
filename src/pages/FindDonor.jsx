@@ -10,6 +10,7 @@ import DonorCard from '../components/DonorCard';
 import { DonorCardSkeleton } from '../components/LoadingSkeleton';
 import EmptyState from '../components/EmptyState';
 import Pagination from '../components/Pagination';
+import { API_URL } from "../config";
 
 const PER_PAGE = 6;
 
@@ -63,7 +64,9 @@ export default function FindDonor() {
       if (filters.city) params.append('city', filters.city);
       if (filters.taluk) params.append('taluk', filters.taluk);
 
-      const { data } = await axios.get(`http://localhost:5000/api/donors/search?${params.toString()}`);
+      const { data } = await axios.get(
+  `${API_URL}/api/donors/search?${params.toString()}`
+);
       
       // Map MongoDB _id to id so the DonorCard works without modification
       const mappedData = data.map(d => ({ 

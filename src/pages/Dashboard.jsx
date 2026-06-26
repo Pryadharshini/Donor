@@ -5,6 +5,7 @@ import { FaTint, FaHeartbeat } from 'react-icons/fa';
 import axios from 'axios';
 import { DONATION_HISTORY } from '../data/dummy';
 import { useApp } from '../context/AppContext';
+import { API_URL } from "../config";
 
 const NOTIFICATIONS = []; // Cleared dummy notifications
 
@@ -19,6 +20,7 @@ export default function Dashboard() {
   const [saving, setSaving] = useState(false);
   const { user, addToast } = useApp();
   const navigate = useNavigate();
+  
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -26,7 +28,7 @@ export default function Dashboard() {
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
         if (!token) return navigate('/login');
         
-        const { data } = await axios.get('http://localhost:5000/api/donors/profile', {
+        const { data } = await axios.get(`${API_URL}/api/donors/profile`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         setProfile(data);
@@ -40,7 +42,7 @@ export default function Dashboard() {
           taluk: data.taluk
         });
 
-        const { data: donData } = await axios.get('http://localhost:5000/api/donations', {
+        const { data: donData } = await axios.get(`${API_URL}/api/donations`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         setDonations(donData);
@@ -56,7 +58,7 @@ export default function Dashboard() {
     try {
       const token = localStorage.getItem('token') || sessionStorage.getItem('token');
       const newStatus = !available;
-      await axios.put('http://localhost:5000/api/donors/profile', { isAvailable: newStatus }, {
+      await axios.put(`${API_URL}/api/donors/profile`, { isAvailable: newStatus }, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setAvailable(newStatus);
@@ -70,7 +72,7 @@ export default function Dashboard() {
     setSaving(true);
     try {
       const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      const { data } = await axios.put('http://localhost:5000/api/donors/profile', editForm, {
+      const { data } = await axios.put(`${API_URL}/api/donors/profile`, editForm, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setProfile(data);
@@ -90,7 +92,7 @@ export default function Dashboard() {
     }
     try {
       const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      const { data } = await axios.post('http://localhost:5000/api/donations', {
+      const { data } = await axios.post(`${API_URL}/api/donations`, {
         ...donationForm,
         bloodGroup: profile?.bloodGroup || 'O+'
       }, {

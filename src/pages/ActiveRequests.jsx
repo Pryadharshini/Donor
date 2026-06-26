@@ -4,6 +4,7 @@ import { FiAlertCircle, FiMapPin, FiCalendar } from 'react-icons/fi';
 import { FaHospital, FaTint } from 'react-icons/fa';
 import axios from 'axios';
 import { useApp } from '../context/AppContext';
+import { API_URL } from "../config";
 
 export default function ActiveRequests() {
   const [activeRequests, setActiveRequests] = useState([]);
@@ -19,7 +20,7 @@ export default function ActiveRequests() {
 
     const fetchRequests = async () => {
       try {
-        const { data } = await axios.get('http://localhost:5000/api/requests');
+        const { data } = await axios.get(`${API_URL}/api/requests`);
         setActiveRequests(data);
       } catch (err) {
         console.error('Failed to fetch requests', err);

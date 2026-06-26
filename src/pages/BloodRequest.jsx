@@ -7,6 +7,7 @@ import Select from 'react-select';
 import { Country, State, City } from 'country-state-city';
 import { BLOOD_GROUPS } from '../data/dummy';
 import { useApp } from '../context/AppContext';
+import { API_URL } from "../config";
 
 const URGENCY = ['Normal', 'Urgent', 'Critical'];
 const init = { 
@@ -29,7 +30,7 @@ export default function BloodRequest() {
   useEffect(() => {
     const fetchRequests = async () => {
       try {
-        const { data } = await axios.get('http://localhost:5000/api/requests');
+        const { data } = await axios.get(`${API_URL}/api/requests`);
         setActiveRequests(data);
       } catch (err) {
         console.error('Failed to fetch requests', err);
@@ -64,14 +65,14 @@ export default function BloodRequest() {
 
     setLoading(true);
     try {
-      await axios.post('http://localhost:5000/api/requests', form);
+      await axios.post(`${API_URL}/api/requests`, form);
       setLoading(false);
       setSubmitted(true);
       window.scrollTo(0, 0);
       addToast('Blood request submitted! Donors in your area will be notified.', 'success');
       
       // Refresh requests
-      const { data } = await axios.get('http://localhost:5000/api/requests');
+      const { data } = await axios.get(`${API_URL}/api/requests`);
       setActiveRequests(data);
     } catch (error) {
       setLoading(false);

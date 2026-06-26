@@ -32,7 +32,7 @@ export default function ForgotPassword() {
 
     setLoading(true);
     try {
-      await axios.post('http://localhost:5000/api/donors/reset-password', {
+      await axios.post(`${API_URL}/api/donors/reset-password`, {
         email: form.email,
         mobile: form.mobile,
         newPassword: form.newPassword

@@ -4,6 +4,7 @@ import { FiUsers, FiAlertCircle, FiCheckCircle, FiTrendingUp, FiSearch, FiTrash2
 import { FaTint } from 'react-icons/fa';
 import axios from 'axios';
 import { useApp } from '../context/AppContext';
+import { API_URL } from "../config";
 
 export default function Admin() {
   const [activeTab, setActiveTab] = useState('overview');
@@ -31,9 +32,9 @@ export default function Admin() {
       const config = { headers: { Authorization: `Bearer ${token}` } };
       
       const [statsRes, donorsRes, reqsRes] = await Promise.all([
-        axios.get('http://localhost:5000/api/admin/stats', config),
-        axios.get('http://localhost:5000/api/admin/donors', config),
-        axios.get('http://localhost:5000/api/admin/requests', config)
+        axios.get(`${API_URL}/api/admin/stats`, config),
+        axios.get(`${API_URL}/api/admin/donors`, config),
+        axios.get(`${API_URL}/api/admin/requests`, config)
       ]);
       
       setStats(statsRes.data);
@@ -50,7 +51,7 @@ export default function Admin() {
     if (!window.confirm('Are you sure you want to delete this donor?')) return;
     try {
       const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      await axios.delete(`http://localhost:5000/api/admin/donors/${id}`, {
+      await axios.delete(`${API_URL}/api/admin/donors/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setDonors(donors.filter(d => d._id !== id));
@@ -64,7 +65,7 @@ export default function Admin() {
     if (!window.confirm('Are you sure you want to delete this request?')) return;
     try {
       const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      await axios.delete(`http://localhost:5000/api/admin/requests/${id}`, {
+      await axios.delete(`${API_URL}/api/admin/requests/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setRequests(requests.filter(r => r._id !== id));

@@ -107,7 +107,10 @@ export default function RegisterDonor() {
 
     setLoading(true);
     try {
-      const { data } = await axios.post('http://localhost:5000/api/donors/register', form);
+      const { data } = await axios.post(
+  `${import.meta.env.VITE_API_URL}/api/donors/register`,
+  form
+);
       setLoading(false);
       setSubmitted(true);
       addToast('Registration successful! Welcome to Nanbargal Blood Foundation.', 'success');

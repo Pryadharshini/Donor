@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
+import { API_URL } from "../config";
 
 const AppContext = createContext();
 
@@ -21,7 +22,8 @@ export function AppProvider({ children }) {
       if (!token) return;
 
       try {
-        const { data } = await axios.get('http://localhost:5000/api/donors/profile', {
+        const { data } = await axios.get(`${API_URL}/api/donors/profile`, {
+
           headers: { Authorization: `Bearer ${token}` }
         });
         setUser({ name: data.fullName, email: data.email, bloodGroup: data.bloodGroup, role: data.role || 'donor' });
